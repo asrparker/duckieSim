@@ -1,7 +1,8 @@
 import gym_duckietown
 from gym_duckietown.simulator import Simulator
 import gym
-import numpy as np # Needed for actions
+import numpy as np
+import time
 
 print("gym_duckietown imported successfully!")
 
@@ -11,36 +12,41 @@ try:
     env = Simulator(
         seed=123,
         map_name="loop_empty", # A simple, empty loop map
-        max_steps=500001,
+        max_steps=50000,
         domain_rand=0,
         camera_width=640,
         camera_height=480,
         accept_start_angle_deg=4,
-        # draw_curve=True,  # Optional: Draws the ideal path
-        # draw_bbox=True,   # Optional: Draws bounding boxes around objects
-        # frame_rate=30     # Optional: Limit the simulation frame rate
+        headless=False # Explicitly set to False
     )
     print("Duckietown simulator environment created successfully!")
 
     # Reset the environment to get initial observation
     obs = env.reset()
 
-    # Simple loop to step through the environment and render
-    # The Duckiebot will just drive straight
-    for step in range(300): # Run for 300 simulation steps
-        action = np.array([0.5, 0.0]) # [forward_velocity, steering_angle] - 0.5 m/s forward, no steering
-        obs, reward, done, info = env.step(action)
-        env.render() # IMPORTANT: This is what makes the window appear!
+    # --- TEMPORARY CHANGE FOR DEBUGGING: Render once and wait ---
+    print("Attempting to render one frame and wait for 5 seconds...")
+    env.render() # Render the initial frame
+    time.sleep(5) # Keep the window open for 5 seconds
 
-        if done: # Check if the episode is finished (e.g., crashed, fell off map)
-            print(f"Episode finished after {step+1} steps.")
-            break
+    # --- ORIGINAL SIMULATION LOOP (COMMENTED OUT FOR THIS TEST) ---
+    # for step in range(500):
+    #     action = np.array([0.5, 0.0])
+    #     obs, reward, done, info = env.step(action)
+    #     env.render()
+    #     time.sleep(0.01)
+    #
+    #     if done:
+    #         print(f"Episode finished after {step+1} steps.")
+    #         break
 
     env.close() # Close the simulator window
     print("Simulator environment closed.")
 
 except Exception as e:
     print(f"Error running Duckietown simulator with rendering: {e}")
+    import traceback
+    traceback.print_exc() # Print full traceback for more info
 
 # --- (Original non-visual test, keeping for completeness but not the focus) ---
 print("\n--- Testing Registered Gym Environment (non-visual - for internal check) ---")
