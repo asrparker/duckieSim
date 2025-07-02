@@ -1,60 +1,48 @@
+#!/usr/bin/env python3
 import gym_duckietown
 from gym_duckietown.simulator import Simulator
-import gym
-import numpy as np
-import time
+import time # Import time for potential future use, though not directly used in this loop
 
-print("gym_duckietown imported successfully!")
+print("Initializing Duckietown Simulator...")
 
-# --- Running Simulator (with graphics) ---
-print("\n--- Running Duckietown Simulator with Graphics ---")
+# Instantiate the Simulator with your chosen parameters
+env = Simulator(
+    seed=123,  # random seed
+    map_name="loop_empty",
+    max_steps=500001,  # we don't want the gym to reset itself automatically too soon
+    domain_rand=0,
+    camera_width=640,
+    camera_height=480,
+    accept_start_angle_deg=4,  # start close to straight
+    full_transparency=True,
+    distortion=True,
+)
+
+print("Simulator initialized. Starting continuous simulation loop...")
+print("Press Ctrl+C in the terminal to stop the simulation.")
+
 try:
-    env = Simulator(
-        seed=123,
-        map_name="loop_empty", # A simple, empty loop map
-        max_steps=50000,
-        domain_rand=0,
-        camera_width=640,
-        camera_height=480,
-        accept_start_angle_deg=4,
-        headless=False # Explicitly set to False
-    )
-    print("Duckietown simulator environment created successfully!")
+    # Reset the environment to get initial observation and setup the first frame
+    observation = env.reset()
 
-    # Reset the environment to get initial observation
-    obs = env.reset()
+    while True:
+        action = [0.1, 0.1] # Example action: move forward slightly, no turn
+        observation, reward, done, misc = env.step(action)
+        env.render() # This command should attempt to open and update the graphical window
 
-    # --- TEMPORARY CHANGE FOR DEBUGGING: Render once and wait ---
-    print("Attempting to render one frame and wait for 5 seconds...")
-    env.render() # Render the initial frame
-    time.sleep(5) # Keep the window open for 5 seconds
+        if done:
+            print("Episode finished. Resetting environment...")
+            env.reset()
 
-    # --- ORIGINAL SIMULATION LOOP (COMMENTED OUT FOR THIS TEST) ---
-    # for step in range(500):
-    #     action = np.array([0.5, 0.0])
-    #     obs, reward, done, info = env.step(action)
-    #     env.render()
-    #     time.sleep(0.01)
-    #
-    #     if done:
-    #         print(f"Episode finished after {step+1} steps.")
-    #         break
-
-    env.close() # Close the simulator window
-    print("Simulator environment closed.")
-
+except KeyboardInterrupt:
+    # This block will execute when you press Ctrl+C
+    print("\nSimulation interrupted by user (Ctrl+C).")
 except Exception as e:
-    print(f"Error running Duckietown simulator with rendering: {e}")
+    print(f"An error occurred during simulation: {e}")
     import traceback
     traceback.print_exc() # Print full traceback for more info
-
-# --- (Original non-visual test, keeping for completeness but not the focus) ---
-print("\n--- Testing Registered Gym Environment (non-visual - for internal check) ---")
-try:
-    env_gym = gym.make("Duckietown-small_loop-v0")
-    print("Registered Gym environment 'Duckietown-small_loop-v0' created successfully!")
-    env_gym.close()
-    print("Registered environment closed.")
-except Exception as e:
-    print(f"Error creating registered Gym environment: {e}")
+finally:
+    # Ensure the environment is closed cleanly
+    env.close()
+    print("Simulator environment closed.")
     
