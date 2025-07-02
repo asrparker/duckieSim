@@ -1,0 +1,14 @@
+project structure
+
+sim/
+├── src/          # Your primary, application-specific Python code
+├── config/       # Global configuration files (e.g., simulation settings, map parameters)
+├── models/       # Saved AI models (e.g., trained policies, guidance agents)
+├── utils/        # Generic helper functions used across the project
+├── ext_libs/     # External libraries you fork/modify (like gym-duckietown)
+├── .venv/        # Your Python virtual environment
+├── README.md     # Project overview
+├── requirements.txt # Project dependencies
+├── .gitignore    # Files to ignore for Git
+
+

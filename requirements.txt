@@ -1,0 +1,17 @@
+# Core Reinforcement Learning / Robotics Libraries
+gym==0.23.1     # The main library for defining and interacting with RL environments (successor to OpenAI Gym)
+numpy==1.23.5   # Fundamental package for numerical computing with Python (especially for arrays and matrices)
+pyglet          # A cross-platform windowing and multimedia library, used by gym-duckietown for rendering graphics
+# We are using a modern repo for duckietown-gym-daffy located at:
+# 
+
+# Data Analysis and Visualization Libraries
+# matplotlib    # A comprehensive library for creating static, animated, and interactive visualizations in Python
+# scipy         # Ecosystem of open-source software for mathematics, science, and engineering (builds on NumPy)
+# pandas        # Library for data manipulation and analysis (especially for tabular data)
+
+# Computer Vision Libraries
+# opencv-python # Python bindings for OpenCV, a vast library for computer vision tasks
+
+# Development and Testing Utilities
+# pytest        # A popular framework for writing and running tests in Python
