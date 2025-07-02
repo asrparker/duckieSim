@@ -1,27 +1,27 @@
 # Python-related build and cache files
-__pycache__/        # Directory where Python stores bytecode (.pyc files)
-*.pyc               # Compiled Python bytecode files
-*.pyo               # Optimized Python bytecode files
-*.pyd               # Windows-specific Python DLLs (often compiled C extensions)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Python version manager specific files
-.python-version  # Python version file for pyenv
+.python-version
 
 # Virtual Environment directories
-.venv/              # Common name for virtual environment folder (the one you chose)
-venv/               # Another common name for virtual environment folder
+/.venv/
+venv/
 
 # Operating System and Editor Temporary/Config Files
-.DS_Store           # macOS directory service store files
-*.swp               # Vim editor swap files (for crash recovery)
+.DS_Store
+*.swp
 
 # Jupyter Notebook and IPython files
-.ipynb_checkpoints/ # Directories where Jupyter Notebooks save progress checkpoints
+.ipynb_checkpoints/
 
 # IDE (Integrated Development Environment) Configuration Files
-.vscode/            # Visual Studio Code configuration folder
-.vscode_backup/      # Backup folder for Visual Studio Code
-.idea/              # JetBrains IDEs (like PyCharm) configuration folder
+.vscode/
+.vscode_backup/
+.idea/
 
 # Log files
-*.log               # Generic ignore for any file ending with .log
+*.log
