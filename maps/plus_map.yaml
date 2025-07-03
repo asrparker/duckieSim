@@ -1,0 +1,38 @@
+tiles:
+  -
+    kind: straight
+    coords: [2, 4]
+    angle: 0
+  -
+    kind: straight
+    coords: [2, 3]
+    angle: 0
+  -
+    kind: straight
+    coords: [2, 1]
+    angle: 2
+  -
+    kind: straight
+    coords: [2, 0]
+    angle: 2
+  -
+    kind: straight
+    coords: [1, 2]
+    angle: 3
+  -
+    kind: straight
+    coords: [0, 2]
+    angle: 3
+  -
+    kind: straight
+    coords: [3, 2]
+    angle: 1
+  -
+    kind: straight
+    coords: [4, 2]
+    angle: 1
+  -
+    kind: 4way
+    coords: [2, 2]
+    angle: 0
+    

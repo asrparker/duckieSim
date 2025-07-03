@@ -15,7 +15,7 @@ env = Simulator(
     camera_height=480,
     accept_start_angle_deg=4,  # start close to straight
     full_transparency=True,
-    distortion=True,
+    distortion=False,
 )
 
 print("Simulator initialized. Starting continuous simulation loop...")
@@ -45,4 +45,3 @@ finally:
     # Ensure the environment is closed cleanly
     env.close()
     print("Simulator environment closed.")
-    
