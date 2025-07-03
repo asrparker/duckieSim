@@ -1,38 +1,11 @@
+# A 5x5 grid representing a plus-shaped map with 9 road tiles
 tiles:
-  -
-    kind: straight
-    coords: [2, 4]
-    angle: 0
-  -
-    kind: straight
-    coords: [2, 3]
-    angle: 0
-  -
-    kind: straight
-    coords: [2, 1]
-    angle: 2
-  -
-    kind: straight
-    coords: [2, 0]
-    angle: 2
-  -
-    kind: straight
-    coords: [1, 2]
-    angle: 3
-  -
-    kind: straight
-    coords: [0, 2]
-    angle: 3
-  -
-    kind: straight
-    coords: [3, 2]
-    angle: 1
-  -
-    kind: straight
-    coords: [4, 2]
-    angle: 1
-  -
-    kind: 4way
-    coords: [2, 2]
-    angle: 0
-    
+- [grass, grass, straight/S, grass, grass]  # Row 0
+- [grass, grass, straight/S, grass, grass]  # Row 1
+- [straight/E, straight/E, 4way, straight/W, straight/W] # Row 2 (Center horizontal arm)
+- [grass, grass, straight/N, grass, grass]  # Row 3
+- [grass, grass, straight/N, grass, grass]  # Row 4
+
+objects: [] # No objects for now
+
+tile_size: 0.585 # Standard Duckietown tile size
