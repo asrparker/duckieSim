@@ -19,13 +19,13 @@ class FeedbackWindow(pyglet.window.Window):
     def __init__(self, width, height, title='Feedback', feedback_duration=0.1, blink_interval=0.3):
         super().__init__(width, height, caption=title, resizable=False)
         self.feedback_active = False
-        self.feedback_start_time = 0.0
         self.feedback_duration = feedback_duration # Duration of each individual blink (on-time)
         self.blink_interval = blink_interval     # Pause duration between blinks (off-time)
 
-        self.current_blink_count = 0 # How many blinks have been completed so far
+        self.current_blink_number = 0 # Which blink in the sequence we are currently trying to display (1-indexed)
         self.total_blinks_requested = 0 # Total number of blinks for the current sequence
-        self.next_state_change_time = 0.0 # When the current blink/pause should end
+        self.last_state_change_time = 0.0 # Time when the current blink/pause state began
+        self.is_blinking_on_state = False # True if currently drawing the rectangle, False if in a pause
 
         self.set_location(100, 100) # Initial position for the feedback window
 
@@ -44,16 +44,13 @@ class FeedbackWindow(pyglet.window.Window):
         color: RGB or RGBA tuple for the blink color.
         """
         self.feedback_active = True
-        self.current_blink_count = 0 # Reset count for new sequence
         self.total_blinks_requested = num_blinks
         self.feedback_color = color
         
-        # Immediately start the first blink
-        self.next_state_change_time = time.time() + self.feedback_duration 
-        # The first blink is "on" immediately, and will turn off after feedback_duration
-        
-        # Increment current_blink_count to mark that the first blink has started
-        self.current_blink_count = 1
+        # Start the first blink immediately
+        self.current_blink_number = 1
+        self.is_blinking_on_state = True
+        self.last_state_change_time = time.time()
 
 
     def on_draw(self):
@@ -64,47 +61,53 @@ class FeedbackWindow(pyglet.window.Window):
         if not self.feedback_active:
             return # No feedback sequence is active
 
-        # If we are currently displaying a blink (rectangle is ON)
-        if self.current_blink_count > 0 and current_time < self.next_state_change_time:
-            # Draw the rectangle
-            gl.glMatrixMode(gl.GL_PROJECTION)
-            gl.glLoadIdentity()
-            gl.glOrtho(0, self.width, 0, self.height, -1, 1)
+        # Calculate time elapsed in the current state (on or off)
+        time_in_current_state = current_time - self.last_state_change_time
 
-            gl.glMatrixMode(gl.GL_MODELVIEW)
-            gl.glLoadIdentity()
+        if self.is_blinking_on_state: # We are in the "ON" state (drawing the rectangle)
+            if time_in_current_state < self.feedback_duration:
+                # Still within the ON duration, so draw it
+                gl.glMatrixMode(gl.GL_PROJECTION)
+                gl.glLoadIdentity()
+                gl.glOrtho(0, self.width, 0, self.height, -1, 1)
 
-            gl.glDisable(gl.GL_DEPTH_TEST) 
-            gl.glEnable(gl.GL_BLEND)
-            gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+                gl.glMatrixMode(gl.GL_MODELVIEW)
+                gl.glLoadIdentity()
 
-            gl.glColor4f(*self.feedback_color) 
+                gl.glDisable(gl.GL_DEPTH_TEST) 
+                gl.glEnable(gl.GL_BLEND)
+                gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
-            gl.glBegin(gl.GL_QUADS)
-            gl.glVertex2f(self.rect_x, self.rect_y)
-            gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y)
-            gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y + self.rect_height)
-            gl.glVertex2f(self.rect_x, self.rect_y + self.rect_height)
-            gl.glEnd()
+                gl.glColor4f(*self.feedback_color) 
 
-            gl.glDisable(gl.GL_BLEND)
-            gl.glEnable(gl.GL_DEPTH_TEST) 
-        
-        # If we are NOT currently displaying a blink (rectangle is OFF or blink just ended)
-        else:
-            # Check if it's time to transition to the next state (either start next blink or end sequence)
-            if current_time >= self.next_state_change_time:
-                # If there are more blinks left to do
-                if self.current_blink_count < self.total_blinks_requested:
-                    # Start the next blink (transition from OFF to ON)
-                    self.current_blink_count += 1
-                    self.next_state_change_time = current_time + self.feedback_duration
-                    # No drawing here, it will be drawn in the next on_draw call when current_time < next_state_change_time
-                # If all blinks have been displayed
+                gl.glBegin(gl.GL_QUADS)
+                gl.glVertex2f(self.rect_x, self.rect_y)
+                gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y)
+                gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y + self.rect_height)
+                gl.glVertex2f(self.rect_x, self.rect_y + self.rect_height)
+                gl.glEnd()
+
+                gl.glDisable(gl.GL_BLEND)
+                gl.glEnable(gl.GL_DEPTH_TEST) 
+            else:
+                # ON duration has passed, transition to OFF state
+                if self.current_blink_number < self.total_blinks_requested:
+                    # More blinks to go, so go into a pause (OFF state)
+                    self.is_blinking_on_state = False
+                    self.last_state_change_time = current_time
                 else:
-                    self.feedback_active = False # End the entire feedback sequence
-            # Else (current_time < self.next_state_change_time), we are in the "off" (pause) period between blinks
-            # So, do nothing (don't draw)
+                    # All blinks completed, end the sequence
+                    self.feedback_active = False
+
+        else: # self.is_blinking_on_state is False, meaning we are in the "OFF" (pause) state
+            if time_in_current_state < self.blink_interval:
+                # Still within the OFF duration, so do nothing (don't draw)
+                pass
+            else:
+                # OFF duration has passed, transition to ON state for the next blink
+                self.current_blink_number += 1
+                self.is_blinking_on_state = True
+                self.last_state_change_time = current_time
             
 # --- Key press/release functions ---
 def on_key_press(symbol, modifiers):
@@ -155,11 +158,13 @@ env.render() # This creates the simulator's window
 
 # --- Create the Feedback Window ---
 feedback_win = FeedbackWindow(width=200, height=100, title='Duckiebot Feedback', 
-                              feedback_duration=0.1, blink_interval=0.3)
+                              feedback_duration=0.2, blink_interval=0.2)
 # Position the feedback window next to the simulator window
 sim_x, sim_y = env.unwrapped.window.get_location()
 feedback_win.set_location(sim_x + env.unwrapped.window.width + 20, sim_y)
 
+# --- Activate the simulator window to give it focus ---
+env.unwrapped.window.activate() 
 
 # Push key event handlers to the SIMULATOR'S window
 env.unwrapped.window.push_handlers(on_key_press)
