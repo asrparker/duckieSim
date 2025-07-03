@@ -7,10 +7,35 @@ from pyglet import app
 
 print("Initializing Duckietown Simulator...")
 
+# Define the key press/release functions WITHOUT the decorators initially
+# These functions will be registered as event handlers later
+def on_key_press(symbol, modifiers):
+    if symbol == key.ESCAPE:
+        env.close()
+        app.exit()
+    elif symbol == key.UP:
+        env.robot.set_right_wheel_velocity(1.0) # CORRECTED LINE
+        env.robot.set_left_wheel_velocity(1.0)  # CORRECTED LINE
+    elif symbol == key.DOWN:
+        env.robot.set_right_wheel_velocity(-1.0) # CORRECTED LINE
+        env.robot.set_left_wheel_velocity(-1.0)  # CORRECTED LINE
+    elif symbol == key.LEFT:
+        env.robot.set_right_wheel_velocity(1.0) # CORRECTED LINE
+        env.robot.set_left_wheel_velocity(0.0)  # CORRECTED LINE
+    elif symbol == key.RIGHT:
+        env.robot.set_right_wheel_velocity(0.0) # CORRECTED LINE
+        env.robot.set_left_wheel_velocity(1.0)  # CORRECTED LINE
+
+def on_key_release(symbol, modifiers):
+    if symbol == key.UP or symbol == key.DOWN or \
+       symbol == key.LEFT or symbol == key.RIGHT:
+        env.robot.set_right_wheel_velocity(0.0) # CORRECTED LINE
+        env.robot.set_left_wheel_velocity(0.0)  # CORRECTED LINE
+
 # Instantiate the Simulator with your chosen parameters
 env = Simulator(
     seed=123,
-    map_name="plus_map", # Using map_name as the file is now in the default search path
+    map_name="plus_map",
     max_steps=500001,
     domain_rand=0,
     camera_width=640,
@@ -20,33 +45,13 @@ env = Simulator(
     distortion=False,
 )
 
-# Basic control for the Duckiebot
-@env.unwrapped.window.event
-def on_key_press(symbol, modifiers):
-    if symbol == key.ESCAPE:
-        env.close()
-        app.exit()
-    elif symbol == key.UP:
-        env.set_right_wheel_velocity(1.0)
-        env.set_left_wheel_velocity(1.0)
-    elif symbol == key.DOWN:
-        env.set_right_wheel_velocity(-1.0)
-        env.set_left_wheel_velocity(-1.0)
-    elif symbol == key.LEFT:
-        env.set_right_wheel_velocity(1.0)
-        env.set_left_wheel_velocity(0.0)
-    elif symbol == key.RIGHT:
-        env.set_right_velocity(0.0) # Corrected to set_right_wheel_velocity
-        env.set_left_wheel_velocity(1.0)
+# Reset and render the environment to create the window
+env.reset()
+env.render() # <-- The window is created here
 
-@env.unwrapped.window.event
-def on_key_release(symbol, modifiers):
-    if symbol == key.UP or symbol == key.DOWN or \
-       symbol == key.LEFT or symbol == key.RIGHT:
-        env.set_right_wheel_velocity(0.0)
-        env.set_left_wheel_velocity(0.0)
+# NOW, push the handlers to the window's event stack
+env.unwrapped.window.push_handlers(on_key_press)
+env.unwrapped.window.push_handlers(on_key_release)
 
 # Run the simulation
-env.reset()
-env.render()
 app.run()
