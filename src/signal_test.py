@@ -14,6 +14,10 @@ print("Initializing Duckietown Simulator...")
 # Global action variable for the Duckiebot
 action = np.array([0.0, 0.0])
 
+# --- NEW: Global dictionary to track pressed keys ---
+keys_pressed = {} # Stores {key_symbol: True/False}
+# --- END NEW ---
+
 # --- Feedback Window Class ---
 class FeedbackWindow(pyglet.window.Window):
     def __init__(self, width, height, title='Feedback', feedback_duration=0.1, blink_interval=0.3):
@@ -111,21 +115,14 @@ class FeedbackWindow(pyglet.window.Window):
             
 # --- Key press/release functions ---
 def on_key_press(symbol, modifiers):
-    global action
+    # Store the key as pressed
+    keys_pressed[symbol] = True
+
+    # --- Existing ESCAPE and Feedback Blink Controls (A, S, D keys) ---
     if symbol == key.ESCAPE:
         env.close()
         feedback_win.close() 
         app.exit()
-    # --- Duckiebot Driving Controls (Arrow Keys) ---
-    elif symbol == key.UP:
-        action = np.array([0.5, 0.5])
-    elif symbol == key.DOWN:
-        action = np.array([-0.5, -0.5])
-    elif symbol == key.LEFT:
-        action = np.array([-0.2, 0.2])
-    elif symbol == key.RIGHT:
-        action = np.array([0.2, -0.2])
-    # --- Feedback Blink Controls (A, S, D keys) ---
     elif symbol == key.A:
         feedback_win.activate_feedback(1, color=(1.0, 1.0, 1.0, 1.0)) # 1 blink, white
     elif symbol == key.S:
@@ -134,11 +131,8 @@ def on_key_press(symbol, modifiers):
         feedback_win.activate_feedback(3, color=(1.0, 1.0, 1.0, 1.0)) # 3 blinks, white
 
 def on_key_release(symbol, modifiers):
-    global action
-    if symbol == key.UP or symbol == key.DOWN or \
-       symbol == key.LEFT or symbol == key.RIGHT:
-        action = np.array([0.0, 0.0])
-
+    # Mark the key as released
+    keys_pressed[symbol] = False
 
 # --- Main Simulator Setup ---
 env = Simulator(
@@ -158,7 +152,7 @@ env.render() # This creates the simulator's window
 
 # --- Create the Feedback Window ---
 feedback_win = FeedbackWindow(width=200, height=100, title='Duckiebot Feedback', 
-                              feedback_duration=0.2, blink_interval=0.2)
+                              feedback_duration=0.1, blink_interval=0.3)
 # Position the feedback window next to the simulator window
 sim_x, sim_y = env.unwrapped.window.get_location()
 feedback_win.set_location(sim_x + env.unwrapped.window.width + 20, sim_y)
@@ -173,6 +167,34 @@ env.unwrapped.window.push_handlers(on_key_release)
 # Define an update function that pyglet will call periodically (for simulation steps)
 def update(dt):
     global action
+    
+    # --- NEW: Calculate action based on currently pressed keys ---
+    linear_vel = 0.0
+    angular_vel = 0.0
+
+    base_speed = 0.5
+    turn_rate = 0.2 # For turning in place or while moving
+
+    # Determine linear velocity
+    if keys_pressed.get(key.UP, False) and not keys_pressed.get(key.DOWN, False):
+        linear_vel = base_speed
+    elif keys_pressed.get(key.DOWN, False) and not keys_pressed.get(key.UP, False):
+        linear_vel = -base_speed
+    # If both UP and DOWN are pressed, they cancel out, linear_vel remains 0.0
+
+    # Determine angular velocity
+    if keys_pressed.get(key.LEFT, False) and not keys_pressed.get(key.RIGHT, False):
+        angular_vel = turn_rate # Positive angular_vel means turn left
+    elif keys_pressed.get(key.RIGHT, False) and not keys_pressed.get(key.LEFT, False):
+        angular_vel = -turn_rate # Negative angular_vel means turn right
+    # If both LEFT and RIGHT are pressed, they cancel out, angular_vel remains 0.0
+
+    # Convert linear and angular velocities to left and right wheel velocities
+    # left_wheel_velocity = linear_velocity - angular_velocity
+    # right_wheel_velocity = linear_velocity + angular_velocity
+    action = np.array([linear_vel - angular_vel, linear_vel + angular_vel])
+    # --- END NEW Action Calculation ---
+
     obs, reward, done, info = env.step(action) 
     env.render() 
     env.unwrapped.window.flip() 
