@@ -1,12 +1,12 @@
 # A 7x7 grid representing a plus-shaped map with 9 road tiles
 tiles:
-- [grass, grass, grass, grass, grass]  # Row 0
-- [grass, grass, straight/S, grass, grass]  # Row 1
-- [grass, grass, straight/S, grass, grass]  # Row 2
-- [straight/E, straight/E, 4way, straight/W, straight/W] # Row 3 (Center horizontal arm)
-- [grass, grass, straight/N, grass, grass]  # Row 4
-- [grass, grass, straight/N, grass, grass]  # Row 5
-- [grass, grass, grass, grass, grass]  # Row 6
+- [grass, grass, grass, grass, grass, grass, grass]  # Row 0
+- [grass, grass, grass, straight/S, grass, grass, grass]  # Row 1
+- [grass, grass, grass, straight/S, grass, grass, grass]  # Row 2
+- [grass, straight/E, straight/E, 4way, straight/W, straight/W, grass] # Row 3 (Center horizontal arm)
+- [grass, grass, grass, straight/N, grass, grass, grass]  # Row 4
+- [grass, grass, grass, straight/N, grass, grass, grass]  # Row 5
+- [grass, grass, grass, grass, grass, grass, grass]  # Row 6
 
 objects: [] # No objects for now
 

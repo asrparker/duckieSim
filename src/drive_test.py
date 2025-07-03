@@ -18,19 +18,20 @@ def on_key_press(symbol, modifiers):
         env.close()
         app.exit()
     elif symbol == key.UP:
-        action = np.array([1.0, 0.0])
+        action = np.array([0.5, 0.5])
     elif symbol == key.DOWN:
-        action = np.array([-1.0, 0.0])
+        action = np.array([-0.5, -0.5])
     elif symbol == key.LEFT:
-        action = np.array([0.5, 1.0])
+        action = np.array([-0.2, 0.2])
     elif symbol == key.RIGHT:
-        action = np.array([0.5, -1.0])
+        action = np.array([0.2, -0.2])
 
 def on_key_release(symbol, modifiers):
     global action
     if symbol == key.UP or symbol == key.DOWN or \
        symbol == key.LEFT or symbol == key.RIGHT:
         action = np.array([0.0, 0.0])
+
 
 env = Simulator(
     seed=123,
@@ -40,7 +41,7 @@ env = Simulator(
     camera_width=640,
     camera_height=480,
     accept_start_angle_deg=360,
-    full_transparency=False,
+    full_transparency=True,
     distortion=False,
 )
 
@@ -54,8 +55,8 @@ env.unwrapped.window.push_handlers(on_key_release)
 def update(dt):
     global action
     # Corrected unpacking for older Gym API (4 values)
-    obs, reward, done, info = env.step(action) # <--- THIS LINE IS CORRECTED
-    
+    obs, reward, done, info = env.step(action) 
+
     env.render()
 
     # Check for episode termination using the 'done' flag
