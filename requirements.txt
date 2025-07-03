@@ -1,7 +1,7 @@
 # Core Reinforcement Learning / Robotics Libraries
 gym==0.17.2     # The main library for defining and interacting with RL environments (successor to OpenAI Gym)
 numpy==1.23.5   # Fundamental package for numerical computing with Python (especially for arrays and matrices)
-pyglet==1.5.20  # A cross-platform windowing and multimedia library, used by gym-duckietown for rendering graphics
+pyglet==1.5.0  # A cross-platform windowing and multimedia library, used by gym-duckietown for rendering graphics
 # We are using a modern repo for duckietown-gym-daffy located at:
 # 
 
