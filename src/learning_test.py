@@ -8,6 +8,7 @@ from pyglet import app
 from pyglet import clock
 from pyglet import gl
 import pyglet.window # Explicitly importing pyglet.window for clarity
+import math # Required for math.pi to define angles
 
 print("Initializing Duckietown Simulator...")
 
@@ -22,7 +23,33 @@ action = np.array([0.0, 0.0]) # [left_wheel_velocity, right_wheel_velocity]
 
 # Global dictionary to track which keyboard keys are currently pressed.
 # Stores key symbols as keys and True/False as values.
-keys_pressed = {} # Stores {key_symbol: True/False}
+keys_pressed = {}
+
+# Map Definitions and Fixed Initial Pose
+# These are the (row, column) tile coordinates for the ends of the four arms of the '+' map.
+# Based on a 7x7 map where the junction is at (3,3).
+ARM_END_TILES = {
+    "Top": (1, 3),    # Row 1, Column 3
+    "Right": (3, 5),  # Row 3, Column 5
+    "Bottom": (5, 3), # Row 5, Column 3 - Our fixed starting point
+    "Left": (3, 1)    # Row 3, Column 1
+}
+
+# Define the standard size of a Duckietown road tile in meters.
+# CORRECTED: Updated TILE_SIZE to match the map file's 0.585.
+TILE_SIZE = 0.585
+
+# Define the fixed initial pose (position and angle) for the Duckiebot.
+# This ensures it always starts at the bottom arm facing towards the intersection.
+# 'pos': (x, y, z) where x, z are map coordinates, y is height (usually 0.0).
+# The calculation converts the (row, column) tile index to precise (x, z) world coordinates
+# by multiplying by TILE_SIZE and adding TILE_SIZE/2 to get the center of the tile.
+# IMPORTANT: In Duckietown's 3D world, the X-coordinate corresponds to the tile's COLUMN index,
+# and the Z-coordinate corresponds to the tile's ROW index.
+FIXED_INITIAL_POSE = {
+    'pos': np.array([ARM_END_TILES["Bottom"][1] * TILE_SIZE + TILE_SIZE/2, 0.0, ARM_END_TILES["Bottom"][0] * TILE_SIZE + TILE_SIZE/2]),
+    'angle': math.pi / 2 # Face North (towards the intersection)
+}
 
 
 # ==============================================================================
@@ -183,13 +210,17 @@ env = Simulator(
     domain_rand=0, # Level of domain randomization (0 means no randomization).
     camera_width=640, # Width of the camera view.
     camera_height=480, # Height of the camera view.
-    accept_start_angle_deg=360, # Allows Duckiebot to start at any angle (randomly chosen).
+    # Removed accept_start_angle_deg to prevent potential interference with fixed angle
     full_transparency=False, # Whether to use full transparency for objects.
     distortion=False, # Whether to apply camera distortion.
 )
 
-# Reset the environment to its initial state.
-env.reset()
+# Initial Fixed Pose Setup for the Simulator (for the very first launch)
+# This ensures it always starts at the bottom arm facing towards the intersection.
+env.unwrapped.user_tile_start = ARM_END_TILES["Bottom"] # Sets the starting tile for the simulator's internal logic
+env.unwrapped.user_initial_pose = FIXED_INITIAL_POSE['pos'] # Sets the exact 3D position
+env.unwrapped.user_initial_angle = FIXED_INITIAL_POSE['angle'] # Sets the exact initial angle
+
 # Render the initial state of the simulator to its window.
 env.render() # This command creates the main simulator window.
 
@@ -261,11 +292,29 @@ def update(dt):
     # Flip the window buffer to display the newly rendered frame.
     env.unwrapped.window.flip() 
 
-    # --- Episode Termination Handling ---
+    # MODIFIED SECTION: Episode Termination and Fixed Reset Handling
     # If the episode is finished (e.g., due to max_steps, crash, or reaching a target).
     if done:
-        print("Episode finished. Resetting environment...")
-        env.reset() # Reset the environment to its initial state for a new episode.
+        # DIAGNOSTIC PRINT: Show current tile and reason for termination
+        print(f"Episode finished. Current tile: {info.get('tile', 'N/A')}, Reason: {info.get('reason', 'Unknown')}.")
+        print("Resetting environment to fixed bottom arm...")
+        
+        # Set the internal initial_pos and initial_angle attributes
+        # which env.reset() should use for subsequent resets.
+        env.unwrapped.initial_pos = FIXED_INITIAL_POSE['pos']
+        env.unwrapped.initial_angle = FIXED_INITIAL_POSE['angle']
+        
+        # Perform the reset. This should clear the screen and place the Duckiebot correctly.
+        env.reset() 
+
+        # Render immediately after reset to ensure the display is refreshed.
+        env.render()
+        env.unwrapped.window.flip()
+        
+        # DIAGNOSTIC PRINT: Show Duckiebot's position and angle after reset
+        print(f"Environment reset complete. Duckiebot's new pose: Pos={env.unwrapped.cur_pos}, Angle={env.unwrapped.cur_angle:.2f} radians.")
+        print("Duckiebot should be at the bottom arm, facing north.")
+    # END MODIFIED SECTION
 
 
 # ==============================================================================

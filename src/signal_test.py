@@ -6,8 +6,12 @@ import time
 from pyglet.window import key
 from pyglet import app
 from pyglet import clock
-from pyglet import gl
+# Removed pyglet.gl as it's only used in FeedbackWindow now
 import pyglet.window # Explicitly importing pyglet.window for clarity
+import math # Required for math.pi to define angles
+
+# NEW: Import FeedbackWindow from the new file
+from feedback_window import FeedbackWindow 
 
 print("Initializing Duckietown Simulator...")
 
@@ -24,115 +28,31 @@ action = np.array([0.0, 0.0]) # [left_wheel_velocity, right_wheel_velocity]
 # Stores key symbols as keys and True/False as values.
 keys_pressed = {} # Stores {key_symbol: True/False}
 
+# Map Definitions and Fixed Initial Pose
+# These are the (row, column) tile coordinates for the ends of the four arms of the '+' map.
+# Based on a 7x7 map where the junction is at (3,3).
+ARM_END_TILES = {
+    "Top": (1, 3),    # Row 1, Column 3
+    "Right": (3, 5),  # Row 3, Column 5
+    "Bottom": (5, 3), # Row 5, Column 3 - Our fixed starting point
+    "Left": (3, 1)    # Row 3, Column 1
+}
 
-# ==============================================================================
-# WINDOW CLASSES
-# These classes define the custom Pyglet windows used in the application.
-# ==============================================================================
+# Define the standard size of a Duckietown road tile in meters.
+# CORRECTED: Updated TILE_SIZE to match the map file's 0.585.
+TILE_SIZE = 0.585
 
-# --- Feedback Window Class ---
-# This class creates a separate Pyglet window to display blinking signals.
-class FeedbackWindow(pyglet.window.Window):
-    def __init__(self, width, height, title='Feedback', feedback_duration=0.1, blink_interval=0.3):
-        # Initialize the Pyglet window with specified dimensions and title.
-        super().__init__(width, height, caption=title, resizable=False)
-        
-        # State variables for managing the blinking feedback.
-        self.feedback_active = False # True if a blink sequence is currently running.
-        self.feedback_duration = feedback_duration # Duration (in seconds) that the rectangle is visible (ON state).
-        self.blink_interval = blink_interval     # Duration (in seconds) that the rectangle is hidden (OFF state/pause).
-
-        self.current_blink_number = 0 # Tracks which blink in the sequence is currently being displayed (1-indexed).
-        self.total_blinks_requested = 0 # Total number of blinks requested for the current sequence.
-        self.last_state_change_time = 0.0 # Timestamp when the current blink/pause state began.
-        self.is_blinking_on_state = False # True if currently drawing the rectangle, False if in a pause.
-
-        # Set the initial position of the feedback window on the screen.
-        self.set_location(100, 100)
-
-        # Calculate dimensions for the blinking rectangle to fit within this window.
-        self.rect_width = self.width * 0.8
-        self.rect_height = self.height * 0.8
-        self.rect_x = (self.width - self.rect_width) / 2
-        self.rect_y = (self.height - self.rect_height) / 2
-        
-        self.feedback_color = (1.0, 1.0, 1.0, 1.0) # Default color for the blinking rectangle (White RGBA).
-
-    def activate_feedback(self, num_blinks, color=(1.0, 1.0, 1.0, 1.0)):
-        """
-        Method to be called by the main script to start a new blink sequence.
-        num_blinks: The total number of times the rectangle should blink.
-        color: The RGB or RGBA tuple for the blink color.
-        """
-        self.feedback_active = True # Activate the feedback sequence.
-        self.total_blinks_requested = num_blinks # Set the total number of blinks.
-        self.feedback_color = color # Set the color for the current sequence.
-        
-        # Start the first blink immediately.
-        self.current_blink_number = 1
-        self.is_blinking_on_state = True
-        self.last_state_change_time = time.time() # Record the start time of this first blink.
-
-    def on_draw(self):
-        """
-        Pyglet's drawing event handler for this window.
-        This method is automatically called by Pyglet whenever the window needs to be redrawn.
-        It manages the blinking logic based on elapsed time.
-        """
-        self.clear() # Clear this window's content before drawing.
-        current_time = time.time() # Get the current time.
-
-        if not self.feedback_active:
-            return # If no feedback sequence is active, do nothing.
-
-        # Calculate how long we've been in the current ON or OFF state.
-        time_in_current_state = current_time - self.last_state_change_time
-
-        if self.is_blinking_on_state: # If currently in the "ON" state (drawing the rectangle).
-            if time_in_current_state < self.feedback_duration:
-                # Still within the ON duration, so draw the rectangle.
-                gl.glMatrixMode(gl.GL_PROJECTION)
-                gl.glLoadIdentity()
-                gl.glOrtho(0, self.width, 0, self.height, -1, 1)
-
-                gl.glMatrixMode(gl.GL_MODELVIEW)
-                gl.glLoadIdentity()
-
-                gl.glDisable(gl.GL_DEPTH_TEST) # Disable depth testing for 2D drawing.
-                gl.glEnable(gl.GL_BLEND) # Enable blending for transparency (RGBA colors).
-                gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA) # Standard alpha blending.
-
-                gl.glColor4f(*self.feedback_color) # Set the color for the rectangle.
-
-                # Draw a filled rectangle using GL_QUADS (four vertices).
-                gl.glBegin(gl.GL_QUADS)
-                gl.glVertex2f(self.rect_x, self.rect_y)
-                gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y)
-                gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y + self.rect_height)
-                gl.glVertex2f(self.rect_x, self.rect_y + self.rect_height)
-                gl.glEnd()
-
-                gl.glDisable(gl.GL_BLEND) # Disable blending after drawing.
-                gl.glEnable(gl.GL_DEPTH_TEST) # Re-enable depth testing.
-            else:
-                # ON duration has passed, transition to OFF state (pause).
-                if self.current_blink_number < self.total_blinks_requested:
-                    # If more blinks are needed, go into a pause (OFF state).
-                    self.is_blinking_on_state = False
-                    self.last_state_change_time = current_time # Record start time of pause.
-                else:
-                    # All blinks completed, end the sequence.
-                    self.feedback_active = False
-
-        else: # Currently in the "OFF" state (pause, not drawing).
-            if time_in_current_state < self.blink_interval:
-                # Still within the OFF duration, so do nothing (don't draw anything).
-                pass
-            else:
-                # OFF duration has passed, transition to ON state for the next blink.
-                self.current_blink_number += 1
-                self.is_blinking_on_state = True
-                self.last_state_change_time = current_time # Record start time of next blink.
+# Define the fixed initial pose (position and angle) for the Duckiebot.
+# This ensures it always starts at the bottom arm facing towards the intersection.
+# 'pos': (x, y, z) where x, z are map coordinates, y is height (usually 0.0).
+# The calculation converts the (row, column) tile index to precise (x, z) world coordinates
+# by multiplying by TILE_SIZE and adding TILE_SIZE/2 to get the center of the tile.
+# IMPORTANT: In Duckietown's 3D world, the X-coordinate corresponds to the tile's COLUMN index,
+# and the Z-coordinate corresponds to the tile's ROW index.
+FIXED_INITIAL_POSE = {
+    'pos': np.array([ARM_END_TILES["Bottom"][1] * TILE_SIZE + TILE_SIZE/2, 0.0, ARM_END_TILES["Bottom"][0] * TILE_SIZE + TILE_SIZE/2]),
+    'angle': math.pi / 2 # Face North (towards the intersection)
+}
 
 
 # ==============================================================================
@@ -183,12 +103,20 @@ env = Simulator(
     domain_rand=0, # Level of domain randomization (0 means no randomization).
     camera_width=640, # Width of the camera view.
     camera_height=480, # Height of the camera view.
-    accept_start_angle_deg=360, # Allows Duckiebot to start at any angle (randomly chosen).
+    # CRITICAL MODIFICATION: Removed accept_start_angle_deg to prevent random angles.
+    # This parameter explicitly allows random angles, which conflicts with our goal.
+    # The default behavior without this parameter should be more deterministic if user_initial_angle is set.
     full_transparency=False, # Whether to use full transparency for objects.
     distortion=False, # Whether to apply camera distortion.
 )
 
-# Reset the environment to its initial state.
+# Initial Fixed Pose Setup for the Simulator (for the very first launch)
+# These parameters are read by env.reset() for the initial setup.
+env.unwrapped.user_tile_start = ARM_END_TILES["Bottom"] # Sets the starting tile for the simulator's internal logic
+env.unwrapped.user_initial_pose = FIXED_INITIAL_POSE['pos'] # Sets the exact 3D position
+env.unwrapped.user_initial_angle = FIXED_INITIAL_POSE['angle'] # Sets the exact initial angle
+
+# Reset the environment to its initial state using the newly set fixed pose.
 env.reset()
 # Render the initial state of the simulator to its window.
 env.render() # This command creates the main simulator window.
@@ -261,11 +189,30 @@ def update(dt):
     # Flip the window buffer to display the newly rendered frame.
     env.unwrapped.window.flip() 
 
-    # --- Episode Termination Handling ---
+    # MODIFIED SECTION: Episode Termination and Fixed Reset Handling
     # If the episode is finished (e.g., due to max_steps, crash, or reaching a target).
     if done:
-        print("Episode finished. Resetting environment...")
-        env.reset() # Reset the environment to its initial state for a new episode.
+        # DIAGNOSTIC PRINT: Show current tile and reason for termination
+        print(f"Episode finished. Current tile: {info.get('tile', 'N/A')}, Reason: {info.get('reason', 'Unknown')}.")
+        print("Resetting environment to fixed bottom arm...")
+        
+        # Explicitly set the initial pose parameters for the *next* reset.
+        # These are the parameters that env.reset() reads.
+        env.unwrapped.user_tile_start = ARM_END_TILES["Bottom"]
+        env.unwrapped.user_initial_pose = FIXED_INITIAL_POSE['pos']
+        env.unwrapped.user_initial_angle = FIXED_INITIAL_POSE['angle']
+        
+        # Perform the reset. This should clear the screen and place the Duckiebot correctly.
+        env.reset() 
+
+        # Render immediately after reset to ensure the display is refreshed.
+        env.render()
+        env.unwrapped.window.flip()
+        
+        # DIAGNOSTIC PRINT: Show Duckiebot's position and angle after reset
+        print(f"Environment reset complete. Duckiebot's new pose: Pos={env.unwrapped.cur_pos}, Angle={env.unwrapped.cur_angle:.2f} radians.")
+        print("Duckiebot should be at the bottom arm, facing north.")
+    # END MODIFIED SECTION
 
 
 # ==============================================================================
