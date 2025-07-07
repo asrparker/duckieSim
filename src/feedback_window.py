@@ -9,7 +9,7 @@ class FeedbackWindow(pyglet.window.Window):
     A Pyglet window dedicated to displaying blinking visual feedback.
     This class is separated from the main simulation logic for better code organization.
     """
-    def __init__(self, width, height, title='Feedback', feedback_duration=0.1, blink_interval=0.3):
+    def __init__(self, width, height, title='Feedback', feedback_duration=0.2, blink_interval=0.2):
         super().__init__(width, height, caption=title, resizable=False)
         
         self.feedback_active = False
