@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
+import pyglet # Added to fix NameError for pyglet.clock and pyglet.app
 from gym_duckietown.simulator import Simulator 
+# REMOVED: from gym_duckietown.envs import DuckietownEnv # Not used for env instantiation here
 import numpy as np
 import time
 from pyglet.window import key
-from pyglet import app, clock, window 
+from pyglet import app, clock, window # These specific imports are redundant if 'import pyglet' is used, but harmless.
 import math 
 import os 
 import yaml 
-import pyglet.gl as gl # RE-ADDED: For explicit OpenGL clearing
+# REMOVED: import pyglet.gl as gl (no longer needed for explicit clearing)
+from PIL import Image # Added for screenshot functionality from the working code
+import sys # Added for sys.exit(0) for clean shutdown
 
 # Import FeedbackWindow from the separate file (assumes feedback_window.py exists)
 from feedback_window import FeedbackWindow 
 
-print("Initializing Duckietown Simulator (re-introducing explicit OpenGL clearing for clean shutdown)...")
+print("Initializing Duckietown Simulator (removing reward prints)...")
 
 # ==============================================================================
 # CUSTOM MAP PATH (Assumes 'plus_map.yaml' is in the gym_duckietown/maps directory)
@@ -24,8 +28,8 @@ print("Initializing Duckietown Simulator (re-introducing explicit OpenGL clearin
 # ==============================================================================
 
 # Global action variable for the Duckiebot.
-# This will be [left_wheel_velocity, right_wheel_velocity] directly,
-# modified by key presses and releases.
+# NOTE: This global 'action' is now primarily for the KEY_VELOCITIES logic
+# The 'action' array inside update(dt) will be a local variable.
 action = np.array([0.0, 0.0]) 
 
 # Define wheel velocity contributions for each key press
@@ -45,14 +49,14 @@ KEY_VELOCITIES = {
 # Initialize Pyglet's KeyStateHandler to track continuous key presses.
 key_handler = key.KeyStateHandler()
 
-# MODIFIED: on_key_press - Re-added glClear calls
+# MODIFIED: on_key_press - Removed glClear calls, changed app.exit to sys.exit
 def on_key_press(symbol, modifiers):
     global action # Declare global to modify the 'action' variable
     
     if symbol == key.ESCAPE:
         env.close()
         feedback_win.close()
-        app.exit()
+        sys.exit(0) # MODIFIED: Changed app.exit() to sys.exit(0) for cleaner shutdown
     
     # Driving keys: add their corresponding velocities to the global action array
     if symbol in KEY_VELOCITIES:
@@ -67,10 +71,7 @@ def on_key_press(symbol, modifiers):
     elif symbol == key.BACKSPACE or symbol == key.SLASH:
         print("RESET (manual key press)")
         env.reset() 
-        # RE-ADDED: Explicit OpenGL clear calls
-        env.unwrapped.window.switch_to()
-        gl.glClearColor(0, 0, 0, 1) # Set clear color to black
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # Clear color and depth buffers
+        # REMOVED: Explicit OpenGL clear calls
         env.render() 
     
     # Pass the event to the key_handler for other keys (like A,S,D)
@@ -113,10 +114,7 @@ env.reset()
 env.render() 
 env.unwrapped.window.flip() 
 
-# RE-ADDED: Explicit OpenGL clear calls from initial setup
-env.unwrapped.window.switch_to()
-gl.glClearColor(0, 0, 0, 1) # Set clear color to black
-gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # Clear color and depth buffers
+# REMOVED: Explicit OpenGL clear calls from initial setup
 
 
 # Create an instance of the FeedbackWindow.
@@ -136,28 +134,59 @@ env.unwrapped.window.push_handlers(key_handler, on_key_press, on_key_release)
 # MAIN UPDATE LOOP
 # ==============================================================================
 def update(dt):
-    global action # Ensure 'action' is accessible
-    
-    # Directly use the global 'action' array (which is [left_vel, right_vel])
-    obs, reward, done, info = env.step(action) 
-    
-    # IMPORTANT: This render/flip is for the current frame BEFORE checking 'done'.
-    env.render() 
-    env.unwrapped.window.flip() 
+    """
+    This function is called at every frame to handle
+    movement/stepping and redrawing
+    """
+    wheel_distance = 0.102
+    min_rad = 0.08
 
-    # If the episode is finished, reset the environment.
+    # NOTE: 'action' is declared locally here, overriding the global 'action' for this function's scope.
+    # This 'action' will be [linear_velocity, angular_velocity] initially.
+    local_action = np.array([0.0, 0.0]) 
+
+    if key_handler[key.UP]:
+        local_action += np.array([0.3, 0.3]) # Linear velocity forward
+    if key_handler[key.DOWN]:
+        local_action += np.array([-0.3, -0.3]) # Linear velocity backward
+    if key_handler[key.LEFT]:
+        local_action += np.array([-0.2, 0.2]) # Angular velocity positive (turn left)
+    if key_handler[key.RIGHT]:
+        local_action += np.array([0.2, -0.2]) # Angular velocity negative (turn right)
+    if key_handler[key.SPACE]:
+        local_action = np.array([0, 0]) # Stop
+
+    v1 = local_action[0] # Linear velocity
+    v2 = local_action[1] # Angular velocity
+
+    # Limit radius of curvature - this converts linear/angular to left/right wheel velocities
+    if v1 == 0 or abs(v2 / v1) > (min_rad + wheel_distance / 2.0) / (min_rad - wheel_distance / 2.0):
+        # adjust velocities evenly such that condition is fulfilled
+        delta_v = (v2 - v1) / 2 - wheel_distance / (4 * min_rad) * (v1 + v2)
+        v1 += delta_v
+        v2 -= delta_v
+
+    # The 'action' array passed to env.step() is now [left_wheel_velocity, right_wheel_velocity]
+    # after the curvature limit logic.
+    action_to_step = np.array([v1, v2]) 
+
+    obs, reward, done, info = env.step(action_to_step) # Pass the converted action
+    # REMOVED: print("step_count = %s, reward=%.3f" % (env.unwrapped.step_count, reward))
+
+    if key_handler[key.RETURN]:
+        im = Image.fromarray(obs)
+        im.save("screen.png")
+
     if done:
-        print(f"Episode finished. Reason: {info.get('reason', 'Unknown')}. Resetting environment randomly...")
-        env.reset() 
-        # RE-ADDED: Explicit OpenGL clear calls from reset logic
-        env.unwrapped.window.switch_to()
-        gl.glClearColor(0, 0, 0, 1) # Set clear color to black
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # Clear color and depth buffers
-        env.render() # Immediately render the new state to clear the screen
-        print("Environment reset complete. Duckiebot is at a new, random starting position.")
-        
+        print("done!")
+        env.reset()
+        env.render() # Render after reset
+
+    env.render() # Render at the end of every frame
+
 # ==============================================================================
 # PYGLET APPLICATION LOOP
 # ==============================================================================
-clock.schedule_interval(update, 1.0 / env.unwrapped.frame_rate)
-app.run()
+pyglet.clock.schedule_interval(update, 1.0 / env.unwrapped.frame_rate) 
+pyglet.app.run() 
+env.close() 
