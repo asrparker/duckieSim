@@ -118,7 +118,7 @@ def update(dt):
     This function is called at every frame to handle
     movement/stepping and redrawing
     """
-    # User's EXACT control logic for driving
+    # Control logic for driving
     local_action = np.array([0.0, 0.0]) 
 
     if key_handler[key.UP]:
@@ -126,9 +126,9 @@ def update(dt):
     if key_handler[key.DOWN]:
         local_action += np.array([-0.3, -0.3]) # Linear velocity backward
     if key_handler[key.LEFT]:
-        local_action += np.array([-0.2, 0.2]) # Angular velocity positive (turn left)
+        local_action += np.array([-0.2, 0.2]) # Angular velocity
     if key_handler[key.RIGHT]:
-        local_action += np.array([0.2, -0.2]) # Angular velocity negative (turn right)
+        local_action += np.array([0.2, -0.2]) # Angular velocity
     if key_handler[key.SPACE]:
         local_action = np.array([0, 0]) # Stop
 
@@ -136,6 +136,16 @@ def update(dt):
     action_to_step = local_action 
 
     obs, reward, done, info = env.step(action_to_step) # Pass the calculated action
+
+    current_x, _, current_z = env.unwrapped.cur_pos
+    tile_col = int(current_x / env.unwrapped.road_tile_size)
+    tile_row = int(current_z / env.unwrapped.road_tile_size)
+
+    # Calculate position relative to the tile's bottom-left corner
+    relative_x = current_x - (tile_col * env.unwrapped.road_tile_size)
+    relative_z = current_z - (tile_row * env.unwrapped.road_tile_size)
+
+    print(f"Current Tile: [{tile_row}, {tile_col}], Position within Tile: [{relative_x:.3f}, {relative_z:.3f}]")
     
     if key_handler[key.RETURN]:
         im = Image.fromarray(obs)

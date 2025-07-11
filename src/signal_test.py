@@ -118,7 +118,7 @@ def update(dt):
     This function is called at every frame to handle
     movement/stepping and redrawing
     """
-    # User's EXACT control logic for driving
+    # control logic for driving
     local_action = np.array([0.0, 0.0]) 
 
     if key_handler[key.UP]:
@@ -126,9 +126,9 @@ def update(dt):
     if key_handler[key.DOWN]:
         local_action += np.array([-0.3, -0.3]) # Linear velocity backward
     if key_handler[key.LEFT]:
-        local_action += np.array([-0.2, 0.2]) # Angular velocity positive (turn left)
+        local_action += np.array([-0.2, 0.2]) # Angular velocity
     if key_handler[key.RIGHT]:
-        local_action += np.array([0.2, -0.2]) # Angular velocity negative (turn right)
+        local_action += np.array([0.2, -0.2]) # Angular velocity
     if key_handler[key.SPACE]:
         local_action = np.array([0, 0]) # Stop
 
