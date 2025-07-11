@@ -1,13 +1,29 @@
 # A 7x7 grid representing a plus-shaped map with 9 road tiles
+
 tiles:
-- [grass, grass, grass, grass, grass, grass, grass]  # Row 0
-- [grass, grass, grass, straight/S, grass, grass, grass]  # Row 1
-- [grass, grass, grass, straight/S, grass, grass, grass]  # Row 2
-- [grass, straight/E, straight/E, 4way, straight/W, straight/W, grass] # Row 3 (Center horizontal arm)
-- [grass, grass, grass, straight/N, grass, grass, grass]  # Row 4
-- [grass, grass, grass, straight/N, grass, grass, grass]  # Row 5
-- [grass, grass, grass, grass, grass, grass, grass]  # Row 6
+  # This is the list of lists format, confirmed by your example
+  - [grass, grass, grass, grass, grass, grass, grass]                     # Row 0
+  - [grass, grass, grass, straight/S, grass, grass, grass]                # Row 1
+  - [grass, grass, grass, straight/S, grass, grass, grass]                # Row 2
+  - [grass, straight/E, straight/E, 4way, straight/W, straight/W, grass]  # Row 3 (Center horizontal arm)
+  - [grass, grass, grass, straight/N, grass, grass, grass]                # Row 4
+  - [grass, grass, grass, straight/N, grass, grass, grass]                # Row 5
+  - [grass, grass, grass, grass, grass, grass, grass]                     # Row 6
 
-objects: [] # No objects for now
+start_tile: [5, 3]
+start_pose: [[0.4, 0.0, 0.2925], 3.14159] 
 
+objects:
+- kind: tree
+  pos: [5.0, 2.0]
+  rotate: 180
+  height: 0.25
+  optional: true
+
+- kind: tree
+  pos: [5.0, 3.1]
+  rotate: 180
+  height: 0.25
+  optional: true
+    
 tile_size: 0.585 # Standard Duckietown tile size
