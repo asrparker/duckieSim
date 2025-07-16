@@ -11,6 +11,8 @@ import yaml
 from PIL import Image # Added for screenshot functionality from the working code
 import sys # Added for sys.exit(0) for clean shutdown
 
+import Q_learning
+
 # Import FeedbackWindow from the separate file (assumes feedback_window.py exists)
 from feedback_window import FeedbackWindow 
 
@@ -49,9 +51,9 @@ def on_key_press(symbol, modifiers):
         sys.exit(0) # Changed app.exit() to sys.exit(0) for cleaner shutdown
     
     # Feedback window keys
-    elif symbol == key.A: feedback_win.activate_feedback(1, color=(1.0, 1.0, 1.0, 1.0))
-    elif symbol == key.S: feedback_win.activate_feedback(2, color=(1.0, 1.0, 1.0, 1.0)) 
-    elif symbol == key.D: feedback_win.activate_feedback(3, color=(1.0, 1.0, 1.0, 1.0)) 
+    # elif symbol == key.A: feedback_win.activate_feedback(1, color=(1.0, 1.0, 1.0, 1.0))
+    # elif symbol == key.S: feedback_win.activate_feedback(2, color=(1.0, 1.0, 1.0, 1.0)) 
+    # elif symbol == key.D: feedback_win.activate_feedback(3, color=(1.0, 1.0, 1.0, 1.0)) 
     
     # Manual reset key: set flag, actual reset happens in update(dt)
     elif symbol == key.BACKSPACE or symbol == key.SLASH:
@@ -75,6 +77,7 @@ def on_key_release(symbol, modifiers):
 env = Simulator( 
     seed=123, 
     map_name="plus_map", 
+    max_steps=10000,
     camera_width=640,      
     camera_height=480,     
     full_transparency=False, 
@@ -83,6 +86,7 @@ env = Simulator(
     frame_skip=1,         
     camera_rand=False,    
     dynamics_rand=False,  
+    #display_debug=False
 )
 
 # Initial reset of the environment.
@@ -97,7 +101,7 @@ env.unwrapped.window.flip()
 
 # Create an instance of the FeedbackWindow.
 sim_x, sim_y = env.unwrapped.window.get_location()
-feedback_win = FeedbackWindow(width=200, height=100, title='Duckiebot Feedback', 
+feedback_win = FeedbackWindow(width=200, height=100, title='learner Feedback', 
                               feedback_duration=0.2, blink_interval=0.2)
 feedback_win.set_location(sim_x + env.unwrapped.window.width + 20, sim_y)
 feedback_win.activate() 
@@ -108,11 +112,23 @@ env.unwrapped.window.activate()
 # Push both the KeyStateHandler and the individual key event handlers to the simulator's window.
 env.unwrapped.window.push_handlers(key_handler, on_key_press, on_key_release)
 
+learner = Q_learning.QAgent()
+
+junction = (3, 3)
+left = (5, 3)
+straight = (3, 1)
+right = (1, 3)
+
+signalled = False # Flag to track if a signal has been sent
+action = None
+
 # ==============================================================================
 # MAIN UPDATE LOOP
 # ==============================================================================
 def update(dt):
     global manual_reset_pending # Access the global flag
+    global signalled # Access the global signalled flag
+    global action
     
     """
     This function is called at every frame to handle
@@ -145,7 +161,47 @@ def update(dt):
     relative_x = current_x - (tile_col * env.unwrapped.road_tile_size)
     relative_z = current_z - (tile_row * env.unwrapped.road_tile_size)
 
-    print(f"Current Tile: [{tile_row}, {tile_col}], Position within Tile: [{relative_x:.3f}, {relative_z:.3f}]")
+    #print(f"Current Tile: [{tile_row}, {tile_col}], Position within Tile: [{relative_x:.3f}, {relative_z:.3f}]")
+
+    # Put learning stuff here? We have the postion by now
+    # Determine the tagid based on the current tile
+    current_tile = (tile_row, tile_col)
+    tagid = 4
+    if current_tile == junction:
+        tagid = 4
+    elif current_tile == left:
+        tagid = 0
+    elif current_tile == right:
+        tagid = 1
+    elif current_tile == straight:
+        tagid = 2
+    
+    state = learner.tagid_to_state(tagid)
+
+    # use function is_terminal to check if it is a terminal state
+    if not learner.is_terminal(state):
+      # if the tagid shows that the learner is at the intersection point, reset everything to start an episode, and choose an action
+      learner.reset()
+      action = learner.select_action()
+    else:
+      # if the tagid shows that the learner is at the terminal state, update the Q-table, and this should return you an rewar
+      reward = learner.update(action, tagid)
+
+
+    #if in the junction, signal using the action
+    if current_tile == junction and signalled == False:
+        signalled = True
+        feedback_win.activate_feedback(action+1, color=(1.0, 1.0, 1.0, 1.0))
+    
+    if learner.is_terminal(state) and signalled == True:
+        signalled = False
+        if reward > 0:
+            feedback_win.activate_feedback(0, color=(0.0, 1.0, 0.0, 1.0))
+        elif reward < 0:
+            feedback_win.activate_feedback(0, color=(1.0, 0.0, 0.0, 1.0))
+
+    # if in a terminal state, show solid colour depending on the reward
+
     
     if key_handler[key.RETURN]:
         im = Image.fromarray(obs)
@@ -162,6 +218,7 @@ def update(dt):
         env.reset()
         env.render() # Render immediately after reset
         manual_reset_pending = False # Reset the flag after handling
+        feedback_win.activate_feedback(None)
 
     env.render() # Render at the end of every frame
 
