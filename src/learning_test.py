@@ -6,7 +6,9 @@ import time
 from pyglet.window import key
 from pyglet import app, clock, window 
 import math 
-import os 
+import csv
+import os
+import time
 import yaml 
 from PIL import Image # Added for screenshot functionality from the working code
 import sys # Added for sys.exit(0) for clean shutdown
@@ -18,10 +20,20 @@ from feedback_window import FeedbackWindow
 
 print("Initializing Duckietown Simulator (consolidating reset logic)...")
 
-# ==============================================================================
-# CUSTOM MAP PATH (Assumes 'plus_map.yaml' is in the gym_duckietown/maps directory)
-# ==============================================================================
-# CUSTOM_PLUS_MAP_PATH = "/home/adam/Workspace/work/projects/signalling/code/sim/maps/plus_map.yaml"
+def log_single_row(filepath, data_row, header=None):
+    """
+    Logs a single row of data to a CSV file.
+    If the file doesn't exist, it creates it and writes the header (if provided).
+    """
+    file_exists = os.path.exists(filepath)
+    
+    with open(filepath, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        
+        if not file_exists and header:
+            writer.writerow(header) # Write header only if file is new
+        
+        writer.writerow(data_row)
 
 # ==============================================================================
 # CONFIGURATION AND GLOBAL VARIABLES
@@ -114,16 +126,52 @@ env.unwrapped.window.push_handlers(key_handler, on_key_press, on_key_release)
 
 learner = Q_learning.QAgent()
 
+# defince tiles by name
 junction = (3, 3)
 left = (5, 3)
 straight = (3, 1)
 right = (1, 3)
 
+# Global variables for trial management
 signalled = False # Flag to track if a signal has been sent
 action = None
 
 trial = 0
 total_trials = 30 # Total number of trials to run
+
+# Global variables for trial timing
+episode_start_time = 0.0 # To store the timestamp when the current episode/trial began
+signal_start_time = 0.0  # To store the timestamp when the Q-learner activated a signal (blinking)
+episide_end_time = 0.0   # To store the timestamp when the current episode/trial ended
+
+# Define your CSV log file path
+CSV_LOG_FILE = 'duckietown_trial_log.csv'
+
+learning_trial = False # Flag to indicate if this is a learning trial
+
+# Define the header for your CSV file
+# Make sure these strings exactly match your desired column names
+csv_header = [
+    'Trial Number',
+    'Total Time',
+    'Time from Signal to Termination',
+    'Action Taken',
+    'Type of Action', # This might be 'Explore', 'Exploit' or 'Fixed'
+    'Termination Location',
+    'Termination Reward',
+    'Q Table'
+]
+
+#if os.path.exists(CSV_LOG_FILE):
+#    os.remove(CSV_LOG_FILE) # Optional: Remove old log file to start fresh each run
+#    print(f"Removed existing log file: {CSV_LOG_FILE}")
+
+# Log the header row. Pass an empty list for data_row if you only want the header initially.
+# Or, if your first trial data is ready immediately, you can log it with the header.
+# For simplicity, let's just write the header.
+log_single_row(CSV_LOG_FILE, [], header=csv_header) # Pass an empty data_row, header will be written
+
+print(f"CSV logging initialized to {CSV_LOG_FILE} with header.")
 
 # ==============================================================================
 # MAIN UPDATE LOOP
@@ -135,6 +183,10 @@ def update(dt):
     global manual_reset_pending # Access the global flag
     global signalled # Access the global signalled flag
     global action # Access the global action variable
+
+    global episode_start_time
+    global signal_start_time
+    global episide_end_time
     
     """
     This function is called at every frame to handle
@@ -189,8 +241,12 @@ def update(dt):
     if current_tile == junction and signalled == False:
       # if the tagid shows that the learner is at the intersection point, reset everything to start an episode, and choose an action
       learner.reset()
-      action = learner.select_action()
+      if learning_trial:
+        action = learner.select_action()
+      else:
+          action = learner.start_state[0]
       print(f"Learner at state: {learner.state}, selected action: {action}")
+
     elif learner.is_terminal(state) and signalled == True:
       # if the tagid shows that the learner is at the terminal state, update the Q-table, and this should return you an rewar
       reward = learner.update(action, tagid)
@@ -198,6 +254,7 @@ def update(dt):
     #if in the junction, signal using the action
     if current_tile == junction and signalled == False:
         signalled = True
+        signal_start_time = time.time() # Record the time the signal was activated
         feedback_win.activate_feedback((action + 1), color=(1.0, 1.0, 1.0, 1.0))
     
     if learner.is_terminal(state) and signalled == True:
@@ -219,6 +276,7 @@ def update(dt):
     # CONSOLIDATED RESET LOGIC:
     # If episode is finished OR manual reset is pending, perform reset
     if done or manual_reset_pending:
+        episide_end_time = time.time() # Capture the end time of the episode
         if done:
             print(f"Episode finished. Reason: {info.get('reason', 'Unknown')}. Resetting environment randomly...")
         elif manual_reset_pending:
@@ -228,7 +286,27 @@ def update(dt):
         env.render() # Render immediately after reset
         manual_reset_pending = False # Reset the flag after handling
         feedback_win.activate_feedback(None)
+
+        trial_time = episide_end_time - episode_start_time
+        signal_time = episide_end_time - signal_start_time
+
+        data_to_log = [
+        trial,                                          # 'Trial Number'
+        f"{trial_time:.2f}",                            # 'Total Time'
+        f"{signal_time:.2f}",                           # 'Time from Signal to Termination'
+        action,                                         # 'Action Taken'
+        #'Q-Learner' if learning_trial else 'Fixed',    # 'Type of Action' (using your new wording)
+        #current_tile                                   # 'Termination Location'
+        #Rewad,                                         # 'Termination Reward'
+        #Q_Table                                        # 'Q Table'
+        ]   
+
+        log_single_row(CSV_LOG_FILE, data_to_log)
+
         signalled = False
+
+        episode_start_time = time.time() # Capture the end time of the episode
+
         trial += 1
         if trial == total_trials:
             print("All trials completed. Exiting. Thank you for participating!")
@@ -241,6 +319,8 @@ def update(dt):
 # ==============================================================================
 # PYGLET APPLICATION LOOP
 # ==============================================================================
+episode_start_time = time.time() # Initialize the start time for the first episode
+
 pyglet.clock.schedule_interval(update, 1.0 / env.unwrapped.frame_rate) 
 pyglet.app.run() 
 
