@@ -122,13 +122,19 @@ right = (1, 3)
 signalled = False # Flag to track if a signal has been sent
 action = None
 
+trial = 0
+total_trials = 30 # Total number of trials to run
+
 # ==============================================================================
 # MAIN UPDATE LOOP
 # ==============================================================================
 def update(dt):
+    global trial
+    global total_trials
+
     global manual_reset_pending # Access the global flag
     global signalled # Access the global signalled flag
-    global action
+    global action # Access the global action variable
     
     """
     This function is called at every frame to handle
@@ -166,32 +172,33 @@ def update(dt):
     # Put learning stuff here? We have the postion by now
     # Determine the tagid based on the current tile
     current_tile = (tile_row, tile_col)
-    tagid = 4
+    tagid = None
     if current_tile == junction:
-        tagid = 4
+        tagid = 3
     elif current_tile == left:
         tagid = 0
-    elif current_tile == right:
-        tagid = 1
     elif current_tile == straight:
+        tagid = 1
+    elif current_tile == right:
         tagid = 2
     
     state = learner.tagid_to_state(tagid)
+    #print(f"Current Tile: {current_tile}, Tag ID: {tagid}, State: {state}")
 
     # use function is_terminal to check if it is a terminal state
-    if not learner.is_terminal(state):
+    if current_tile == junction and signalled == False:
       # if the tagid shows that the learner is at the intersection point, reset everything to start an episode, and choose an action
       learner.reset()
       action = learner.select_action()
-    else:
+      print(f"Learner at state: {learner.state}, selected action: {action}")
+    elif learner.is_terminal(state) and signalled == True:
       # if the tagid shows that the learner is at the terminal state, update the Q-table, and this should return you an rewar
       reward = learner.update(action, tagid)
-
 
     #if in the junction, signal using the action
     if current_tile == junction and signalled == False:
         signalled = True
-        feedback_win.activate_feedback(action+1, color=(1.0, 1.0, 1.0, 1.0))
+        feedback_win.activate_feedback((action + 1), color=(1.0, 1.0, 1.0, 1.0))
     
     if learner.is_terminal(state) and signalled == True:
         signalled = False
@@ -199,6 +206,8 @@ def update(dt):
             feedback_win.activate_feedback(0, color=(0.0, 1.0, 0.0, 1.0))
         elif reward < 0:
             feedback_win.activate_feedback(0, color=(1.0, 0.0, 0.0, 1.0))
+        else:
+            feedback_win.activate_feedback(None)
 
     # if in a terminal state, show solid colour depending on the reward
 
@@ -219,6 +228,13 @@ def update(dt):
         env.render() # Render immediately after reset
         manual_reset_pending = False # Reset the flag after handling
         feedback_win.activate_feedback(None)
+        signalled = False
+        trial += 1
+        if trial == total_trials:
+            print("All trials completed. Exiting. Thank you for participating!")
+            env.close()
+            feedback_win.close()
+            sys.exit(0)
 
     env.render() # Render at the end of every frame
 

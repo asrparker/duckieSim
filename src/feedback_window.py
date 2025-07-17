@@ -1,14 +1,18 @@
+# feedback_window.py
+
 import pyglet
+from pyglet import gl
 import time
 
 class FeedbackWindow(pyglet.window.Window):
     """
-    A Pyglet window to display visual feedback (blinking or solid color).
+    A Pyglet window dedicated to displaying blinking or solid visual feedback.
 
-    It can display a blinking rectangle for specific feedback IDs (num_blinks 1, 2, 3)
-    or a solid colored rectangle for a continuous signal (num_blinks 0).
+    - If activate_feedback(0, color) is called, it displays a solid color continuously.
+    - If activate_feedback(None) is called, it turns off any active feedback.
+    - If activate_feedback(N, color) where N > 0, it blinks N times (light turns ON N times).
     """
-    def __init__(self, width, height, title, feedback_duration, blink_interval):
+    def __init__(self, width, height, title='Feedback', feedback_duration=0.2, blink_interval=0.2):
         """
         Initializes the FeedbackWindow.
 
@@ -16,76 +20,140 @@ class FeedbackWindow(pyglet.window.Window):
             width (int): The width of the feedback window.
             height (int): The height of the feedback window.
             title (str): The title of the feedback window.
-            feedback_duration (float): How long a blinking feedback (for num_blinks > 0)
-                                       should remain active in seconds.
-            blink_interval (float): The interval (in seconds) at which the blinking
-                                    rectangle toggles visibility.
+            feedback_duration (float): The duration (in seconds) for which the light stays ON
+                                       during a single blink cycle. (0.2s as per your original).
+            blink_interval (float): The duration (in seconds) for which the light stays OFF
+                                    during a single blink cycle. (0.2s as per your original).
         """
-        super().__init__(width, height, title)
-        self.feedback_duration = feedback_duration
-        self.blink_interval = blink_interval
-        self.active_num_blinks = None  # Stores the currently active feedback ID (0, 1, 2, or 3)
-        self.feedback_start_time = 0   # Timestamp when the current feedback started
-        self.blink_state = True        # True for visible, False for hidden during blinking
-        self.last_blink_toggle_time = 0 # Timestamp of the last blink state toggle
-        self.feedback_color = (1.0, 1.0, 1.0, 1.0) # Default color (RGBA: white)
+        super().__init__(width, height, caption=title, resizable=False)
+        
+        self.feedback_active = False        # Overall flag: True if any feedback is active (solid or blinking)
+        self.feedback_duration = feedback_duration # Duration light is ON for a blink
+        self.blink_interval = blink_interval     # Duration light is OFF for a blink
 
-        # Flag to indicate if solid color mode is active (when num_blinks is 0)
-        self.is_solid_color_mode = False 
+        self.current_blink_number = 0       # Counts how many times the light has turned ON
+        self.total_blinks_requested = 0     # The target number of ON states for blinking
+        self.last_state_change_time = 0.0   # Timestamp of the last ON/OFF state change
+        self.is_blinking_on_state = False   # True if the light should currently be ON (for blinking)
+
+        self.is_solid_on_mode = False       # NEW: True if solid color mode is active (num_blinks = 0)
+        
+        self.set_location(100, 100) # Default window position
+
+        self.rect_width = self.width * 0.8
+        self.rect_height = self.height * 0.8
+        self.rect_x = (self.width - self.rect_width) / 2
+        self.rect_y = (self.height - self.rect_height) / 2
+        
+        self.feedback_color = (1.0, 1.0, 1.0, 1.0) # Default color (white)
 
     def activate_feedback(self, num_blinks, color=(1.0, 1.0, 1.0, 1.0)):
-        # If num_blinks is None, deactivate feedback
+        """
+        Activates or deactivates visual feedback.
+
+        Args:
+            num_blinks (int or None):
+                - None: Deactivates any active feedback (turns off).
+                - 0: Activates a continuous solid color.
+                - > 0: Activates blinking for this many "ON" cycles.
+            color (tuple): RGBA tuple (0.0-1.0) for the feedback color.
+        """
         if num_blinks is None:
-            self.active_num_blinks = None
-            self.is_solid_color_mode = False
-            return # Exit the function, no need to set other properties
+            # Case 1: Deactivate all feedback
+            self.feedback_active = False
+            self.is_solid_on_mode = False
+            self.current_blink_number = 0
+            self.is_blinking_on_state = False # Ensure light is off
+            return
 
-        self.active_num_blinks = num_blinks
-        self.feedback_start_time = time.time()
+        # Common setup for activating any feedback
+        self.feedback_active = True
         self.feedback_color = color
-        self.blink_state = True 
-        self.last_blink_toggle_time = time.time()
-
+        
         if num_blinks == 0:
-            self.is_solid_color_mode = True
+            # Case 2: Activate solid color mode
+            self.is_solid_on_mode = True
+            self.total_blinks_requested = 0 # Not relevant for solid mode
+            self.current_blink_number = 0
+            self.is_blinking_on_state = True # Solid color is always "on"
         else:
-            self.is_solid_color_mode = False 
+            # Case 3: Activate blinking mode (num_blinks > 0)
+            self.is_solid_on_mode = False
+            # If a new blinking sequence is requested, reset blink counter and state
+            if num_blinks != self.total_blinks_requested: # Only reset if different blink count requested
+                self.current_blink_number = 0 # Reset count for new sequence
+                self.is_blinking_on_state = True # Always start a new blink sequence with light ON
+                self.last_state_change_time = time.time() # Reset timer for new sequence
+            
+            self.total_blinks_requested = num_blinks
+
 
     def on_draw(self):
         """
-        Pyglet's drawing event handler. Clears the window and draws the feedback.
+        Pyglet's drawing event handler for this window.
+        Handles drawing the rectangle based on the active feedback mode.
         """
         self.clear() # Clear the window content
 
-        if self.active_num_blinks is not None:
-            current_time = time.time()
+        if not self.feedback_active:
+            return # Nothing to draw if feedback is not active
 
-            if self.is_solid_color_mode:
-                # If in solid color mode (num_blinks = 0), always draw the rectangle
-                pyglet.gl.glColor4f(*self.feedback_color)
-                pyglet.graphics.draw(4, pyglet.gl.GL_QUADS,
-                                     ('v2f', (0, 0, self.width, 0, self.width, self.height, 0, self.height)))
-            else:
-                # Logic for blinking feedback (num_blinks 1, 2, 3)
-                # Check if the feedback duration has passed
-                if current_time - self.feedback_start_time < self.feedback_duration:
-                    # Toggle blink state if blink_interval has passed
-                    if current_time - self.last_blink_toggle_time > self.blink_interval:
-                        self.blink_state = not self.blink_state
-                        self.last_blink_toggle_time = current_time
+        current_time = time.time()
 
-                    # Draw the rectangle only if blink_state is True (visible)
-                    if self.blink_state:
-                        pyglet.gl.glColor4f(*self.feedback_color)
-                        pyglet.graphics.draw(4, pyglet.gl.GL_QUADS,
-                                             ('v2f', (0, 0, self.width, 0, self.width, self.height, 0, self.height)))
+        if self.is_solid_on_mode:
+            # Draw solid color if in solid mode
+            gl.glColor4f(*self.feedback_color)
+            gl.glBegin(gl.GL_QUADS)
+            gl.glVertex2f(self.rect_x, self.rect_y)
+            gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y)
+            gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y + self.rect_height)
+            gl.glVertex2f(self.rect_x, self.rect_y + self.rect_height)
+            gl.glEnd()
+        else:
+            # Blinking logic for num_blinks > 0
+            time_since_last_change = current_time - self.last_state_change_time
+
+            if self.is_blinking_on_state:
+                # Light is currently ON
+                if time_since_last_change < self.feedback_duration:
+                    # Still in the ON phase, so draw it
+                    gl.glColor4f(*self.feedback_color)
+                    gl.glBegin(gl.GL_QUADS)
+                    gl.glVertex2f(self.rect_x, self.rect_y)
+                    gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y)
+                    gl.glVertex2f(self.rect_x + self.rect_width, self.rect_y + self.rect_height)
+                    gl.glVertex2f(self.rect_x, self.rect_y + self.rect_height)
+                    gl.glEnd()
                 else:
-                    # If duration passed for blinking IDs, deactivate the feedback
-                    self.active_num_blinks = None 
+                    # ON phase ended. Check if more blinks are needed.
+                    self.current_blink_number += 1 # Increment blink count (light just completed an ON cycle)
+                    if self.current_blink_number < self.total_blinks_requested:
+                        # More blinks needed, switch to OFF state
+                        self.is_blinking_on_state = False
+                        self.last_state_change_time = current_time
+                    else:
+                        # All blinks completed, deactivate feedback
+                        self.feedback_active = False
+                        self.current_blink_number = 0 # Reset count
+                        self.is_blinking_on_state = False # Ensure it's off
+            else:
+                # Light is currently OFF
+                if time_since_last_change < self.blink_interval:
+                    # Still in the OFF phase, do nothing (don't draw)
+                    pass
+                else:
+                    # OFF phase ended, switch back to ON state for the next blink
+                    self.is_blinking_on_state = True
+                    self.last_state_change_time = current_time
+
+        # OpenGL state cleanup (important if other drawing happens)
+        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+
 
     def close(self):
         """
         Closes the feedback window.
         """
         super().close()
-
+        
