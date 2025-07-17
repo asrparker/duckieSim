@@ -32,7 +32,7 @@ def make_epsilon_greedy_policy(Q, epsilon, nA):
 
 
 class QAgent:
-    def __init__(self, nA = 3, discount_factor=1.0, alpha=0.5, epsilon=0.1, episode = 30, model_path = ""):
+    def __init__(self, nA = 3, discount_factor=1.0, alpha=0.5, epsilon=0.1, episode = 25, model_path = ""):
         if model_path == "":
             self.Q = self.reset_Q(3,4)
             self.policy = make_epsilon_greedy_policy(self.Q, epsilon, nA)
@@ -54,6 +54,7 @@ class QAgent:
         self.start_state = (start_state, 0)
         self.state = self.start_state
         self.action = None
+        self.explore = False
       
     def load_model(self, path):
       with open(path, 'rb') as f:
@@ -112,7 +113,10 @@ class QAgent:
     def select_action(self):
         action_probs = self.policy(self.state)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        print (f"Selected action: {action} with probabilities: {action_probs}")
+        if action_probs[action] != np.max(action_probs):
+            self.explore = True
+        else:
+            self.explore = False
         return action       
     
     def update(self, action, tagid):

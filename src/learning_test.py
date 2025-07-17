@@ -135,9 +135,12 @@ right = (1, 3)
 # Global variables for trial management
 signalled = False # Flag to track if a signal has been sent
 action = None
+learning_trial = False # Flag to indicate if this is a learning trial
 
 trial = 0
 total_trials = 30 # Total number of trials to run
+
+q_reward = None
 
 # Global variables for trial timing
 episode_start_time = 0.0 # To store the timestamp when the current episode/trial began
@@ -146,8 +149,6 @@ episide_end_time = 0.0   # To store the timestamp when the current episode/trial
 
 # Define your CSV log file path
 CSV_LOG_FILE = 'duckietown_trial_log.csv'
-
-learning_trial = False # Flag to indicate if this is a learning trial
 
 # Define the header for your CSV file
 # Make sure these strings exactly match your desired column names
@@ -179,6 +180,7 @@ print(f"CSV logging initialized to {CSV_LOG_FILE} with header.")
 def update(dt):
     global trial
     global total_trials
+    global q_reward
 
     global manual_reset_pending # Access the global flag
     global signalled # Access the global signalled flag
@@ -249,7 +251,7 @@ def update(dt):
 
     elif learner.is_terminal(state) and signalled == True:
       # if the tagid shows that the learner is at the terminal state, update the Q-table, and this should return you an rewar
-      reward = learner.update(action, tagid)
+      q_reward = learner.update(action, tagid)
 
     #if in the junction, signal using the action
     if current_tile == junction and signalled == False:
@@ -259,9 +261,9 @@ def update(dt):
     
     if learner.is_terminal(state) and signalled == True:
         signalled = False
-        if reward > 0:
+        if q_reward > 0:
             feedback_win.activate_feedback(0, color=(0.0, 1.0, 0.0, 1.0))
-        elif reward < 0:
+        elif q_reward < 0:
             feedback_win.activate_feedback(0, color=(1.0, 0.0, 0.0, 1.0))
         else:
             feedback_win.activate_feedback(None)
@@ -295,10 +297,10 @@ def update(dt):
         f"{trial_time:.2f}",                            # 'Total Time'
         f"{signal_time:.2f}",                           # 'Time from Signal to Termination'
         action,                                         # 'Action Taken'
-        #'Q-Learner' if learning_trial else 'Fixed',    # 'Type of Action' (using your new wording)
-        #current_tile                                   # 'Termination Location'
-        #Rewad,                                         # 'Termination Reward'
-        #Q_Table                                        # 'Q Table'
+        learner.explore if learning_trial else 'Fixed', # 'Type of Action' (using your new wording)
+        current_tile,                                   # 'Termination Location'
+        q_reward,                                         # 'Termination Reward'
+        learner.Q,                                      # 'Q Table'
         ]   
 
         log_single_row(CSV_LOG_FILE, data_to_log)
