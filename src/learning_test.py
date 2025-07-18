@@ -148,7 +148,7 @@ signal_start_time = 0.0  # To store the timestamp when the Q-learner activated a
 episide_end_time = 0.0   # To store the timestamp when the current episode/trial ended
 
 # Define your CSV log file path
-CSV_LOG_FILE = 'duckietown_trial_log.csv'
+CSV_LOG_FILE = 'TEST02-B-0718.csv'
 
 # Define the header for your CSV file
 # Make sure these strings exactly match your desired column names
@@ -247,7 +247,8 @@ def update(dt):
         action = learner.select_action()
       else:
           action = learner.start_state[0]
-      print(f"Learner at state: {learner.state}, selected action: {action}")
+      #print(f"Learner at state: {learner.state}, selected action: {action}")
+      print(f"Junction reached on trial {trial+1}, {29-trial} remaining! Keep going!")
 
     elif learner.is_terminal(state) and signalled == True:
       # if the tagid shows that the learner is at the terminal state, update the Q-table, and this should return you an rewar
@@ -291,15 +292,22 @@ def update(dt):
 
         trial_time = episide_end_time - episode_start_time
         signal_time = episide_end_time - signal_start_time
-
+        
+        if learning_trial == False:
+            trial_type = 'Fixed'
+        elif learner.explore == True:
+            trial_type = 'Explore'
+        elif learner.explore == False:
+            trial_type = 'Exploit'
+        
         data_to_log = [
         trial,                                          # 'Trial Number'
         f"{trial_time:.2f}",                            # 'Total Time'
         f"{signal_time:.2f}",                           # 'Time from Signal to Termination'
         action,                                         # 'Action Taken'
-        learner.explore if learning_trial else 'Fixed', # 'Type of Action' (using your new wording)
+        trial_type,                                     # 'Type of Action' (using your new wording)
         current_tile,                                   # 'Termination Location'
-        q_reward,                                         # 'Termination Reward'
+        q_reward,                                       # 'Termination Reward'
         learner.Q,                                      # 'Q Table'
         ]   
 
