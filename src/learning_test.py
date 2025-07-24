@@ -135,7 +135,7 @@ right = (1, 3)
 # Global variables for trial management
 signalled = False # Flag to track if a signal has been sent
 action = None
-learning_trial = False # Flag to indicate if this is a learning trial
+learning_trial = True # Flag to indicate if this is a learning trial
 
 trial = 0
 total_trials = 30 # Total number of trials to run
@@ -148,7 +148,7 @@ signal_start_time = 0.0  # To store the timestamp when the Q-learner activated a
 episide_end_time = 0.0   # To store the timestamp when the current episode/trial ended
 
 # Define your CSV log file path
-CSV_LOG_FILE = 'TEST02-B-0718.csv'
+CSV_LOG_FILE = '2201-A-0721.csv'
 
 # Define the header for your CSV file
 # Make sure these strings exactly match your desired column names
